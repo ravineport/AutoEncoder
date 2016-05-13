@@ -1,9 +1,17 @@
+from operator import mul
+
 def outer(x, y):
     return [[xi * yj for yj in y] for xi in x]
 
+
 def affine(x, W, b):
-    h = [sum([wij * xi for wij, xi in zip(wRow, x)]) for wRow in W]
+    for wRow in W:
+        assert len(wRow) == len(x)
+    assert len(W) == len(b)
+
+    h = [sum(map(mul, wRow, x)) for wRow in W]
     return [hi+bi for hi, bi in zip(h, b)]
+
 
 if __name__ == '__main__':
     x = [1,2,3]
