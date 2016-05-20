@@ -1,12 +1,26 @@
+# -*- coding: utf-8 -*-
+'''
+課題1から課題4までの実装
+Python 3.5.1
+OSX 10.10.5 Yosemite
+'''
+
 from operator import mul, add, sub
+from math import sqrt
 import random
-import pprint
+
 
 def outer(x, y):
+    '''
+    ベクトルxとベクトルyの外積
+    '''
     return [[xi * yj for yj in y] for xi in x]
 
 
 def affine(x, W, b):
+    '''
+    アファイン変換  Wx + b
+    '''
     for wRow in W:
         assert len(wRow) == len(x)
     assert len(W) == len(b)
@@ -15,8 +29,10 @@ def affine(x, W, b):
     return list(map(add, h, b))
 
 
-# matrix1 - matrix2
 def subtract_M2_from_M1(matrix1, matrix2):
+    '''
+    2つの行列の引き算  matrix1 - matrix2
+    '''
     for row1, row2 in zip(matrix1, matrix2):
         assert len(row1) == len(row2)
     assert len(matrix1) == len(matrix2)
@@ -24,13 +40,25 @@ def subtract_M2_from_M1(matrix1, matrix2):
     return [list(map(sub, M1row, M2row)) for M1row, M2row in zip(matrix1, matrix2)]
 
 
-# a * matrix
 def multiply_matrix_by_a(matrix, a):
+    '''
+    行列matrixのすべての要素をa倍  a * matrix
+    '''
     return [[a * element  for element in row] for row in matrix]
 
 
 def auto_encoder(file_path, hidden_dim_num=5, epoch_num=1000):
+    '''
+    Auto Encoder
+    隠れ層1層
+    file_path        データセットファイルへのパス
+    hidden_dim_num   隠れ層の次元
+    epoch_num        イテレーション回数
+
+    return           最終的なパラメータ W1, W2, b1, b2のディクショナリ
+    '''
     data = data_from_file(file_path)
+    data['data'] = normalization(data['data'])
     elements_num = data['N']
     params = initialize_params_randomly(hidden_dim_num, data['D'])
 
@@ -43,13 +71,16 @@ def auto_encoder(file_path, hidden_dim_num=5, epoch_num=1000):
             total_loss += params['loss']
             del params['loss']
         average_loss = total_loss / elements_num
-        params['eta'] = params['eta']*0.9
         print(i, average_loss)
 
     return params
 
 
 def learn_one_iteration(x, W1, W2, b1, b2, eta):
+    '''
+    学習の1イテレーション
+    return          学習したパラメータ
+    '''
     args = {'x': x, 'W1': W1, 'W2': W2, 'b1': b1, 'b2': b2}
     args_forward = args.copy()
     args_bp = args.copy()
@@ -57,13 +88,11 @@ def learn_one_iteration(x, W1, W2, b1, b2, eta):
     del args['x']
 
     forward_result = forward(**args_forward)
-    # pprint.pprint(forward_result)
     loss = forward_result['loss']
     del forward_result['loss']
     args_bp.update(forward_result)
 
     bp_result = back_propagation(**args_bp)
-    # pprint.pprint(bp_result)
     args.update(bp_result)
 
     param_result = param_update(**args)
@@ -72,6 +101,9 @@ def learn_one_iteration(x, W1, W2, b1, b2, eta):
 
 
 def forward(x, W1, W2, b1, b2):
+    '''
+    順伝播
+    '''
     h = affine(x, W1, b1)
     y = affine(h, W2, b2)
     assert len(x) == len(y)
@@ -80,17 +112,21 @@ def forward(x, W1, W2, b1, b2):
 
 
 def back_propagation(x, h, y, W1, W2, b1, b2):
+    '''
+    逆伝播
+    '''
     gy = list(map(sub, y, x))
     gW2 = outer(gy, h)
     W2T = list(map(list, zip(*W2)))
-    # for wRow in W2T:
-    #     assert len(wRow) == len(gy)
     gh = [sum(map(mul, wRow, gy)) for wRow in W2T]
     gW1 = outer(gh, x)
     return {'gW1': gW1, 'gW2': gW2, 'gb1': gh, 'gb2': gy}
 
 
 def param_update(W1, W2, b1, b2, gW1, gW2, gb1, gb2, eta):
+    '''
+    パラメータの更新
+    '''
     etaTimesW1 = multiply_matrix_by_a(gW1, eta)
     W1new = subtract_M2_from_M1(W1, etaTimesW1)
     etaTimesW2 = multiply_matrix_by_a(gW2, eta)
@@ -101,6 +137,9 @@ def param_update(W1, W2, b1, b2, gW1, gW2, gb1, gb2, eta):
 
 
 def data_from_file(file_path):
+    '''
+    file_pathから訓練データを取得
+    '''
     data = []
     for line in open(file_path, 'r'):
         data.append(list(map(float, line.split())))
@@ -109,6 +148,11 @@ def data_from_file(file_path):
 
 
 def initialize_params_randomly(hidden_dim_num, data_dim_num):
+    '''
+    パラメータの初期化
+    2つのバイアスの要素すべて0，2つの行列の要素は-0.05~0.05でランダム
+    学習率etaは0.01
+    '''
     W1 = []
     W2 = []
     b1 = [0.0] * hidden_dim_num
@@ -117,42 +161,48 @@ def initialize_params_randomly(hidden_dim_num, data_dim_num):
         W1row = []
         for j in range(data_dim_num):
             W1row.append(random.uniform(-0.05, 0.05))
-            #W1row.append(random.random())
         W1.append(W1row)
 
     for i in range(data_dim_num):
         W2row = []
         for j in range(hidden_dim_num):
             W2row.append(random.uniform(-0.05, 0.05))
-            #W2row.append(random.random())
         W2.append(W2row)
 
     return {'W1': W1, 'W2': W2, 'b1': b1, 'b2': b2, 'eta': 0.01}
 
 
-def initialize_eta():
-    pass
+def normalization(dataset):
+    '''
+    データを正規化
+    (x - min) / (max - min)
+    '''
+    maxV = []
+    minV = []
+    datasetT = list(map(list, zip(*dataset)))
+
+    for data in datasetT:
+        maxV.append(max(data))
+        minV.append(min(data))
+
+    return [list(map(lambda x, max, min: (x - min) / (max - min), data, maxV, minV)) for data in dataset]
+
+
+def print_params2file(params, file_path):
+    '''
+    file_pathに対してparamsをスペース区切りで保存
+    '''
+    f = open(file_path,'w')
+
+    for Wrow in params['W1']:
+        f.write(' '.join(list(map(lambda x: str(x), Wrow))) + '\n')
+    for Wrow in params['W2']:
+        f.write(' '.join(list(map(lambda x: str(x), Wrow))) + '\n')
+    f.write(' '.join(list(map(lambda x: str(x), params['b1']))) + '\n')
+    f.write(' '.join(list(map(lambda x: str(x), params['b2']))) + '\n')
+    f.close()
 
 
 if __name__ == '__main__':
-    # x = [1,2,3]
-    # y = [4,5,6,7,8]
-    # W1 = [[1,2,3], [4,5,6], [7,8,9], [10,11,12]]
-    # W2 = [[1,2,3,4,5], [4,5,6,7,8], [7,8,9,10,11], [10,11,12,13,14]]
-    # b1 = [13,14,15,16]
-    # b2 = [1,2,3,4,5]
-    # eta = 0.01
-    x = [1,2,3,4,5]
-    y = [1,2,3,4,5]
-    W1 = [[1,2,3,4,5], [6,7,8,9,10], [11,12,13,14,15]]
-    W2 = [[1,2,3], [4,5,6], [7,8,9], [10,11,12], [13,14,15]]
-    b1 = [1,2,3]
-    b2 = [1,2,3,4,5]
-    eta = 0.01
-    # pprint.pprint(learn_one_iteration(x, W1, W2, b1, b2, eta))
-    # print(outer(x, y))
-    # print(affine(x, W1, b1))
-    #print(learn_one_iteration(x, W1, W2, b1, b2, eta))
-    #print(data_from_file('./data/dataset.dat'))
-    #print(initialize_params_randomly(5, 10))
-    print(auto_encoder('./data/dataset.dat'))
+    params = auto_encoder('./data/dataset.dat')
+    print_params2file(params, './results/result.txt')
