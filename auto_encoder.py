@@ -8,7 +8,7 @@ OSX 10.10.5 Yosemite
 from operator import mul, add, sub
 from math import sqrt
 import random
-
+import sys
 
 def outer(x, y):
     '''
@@ -58,21 +58,27 @@ def auto_encoder(file_path, hidden_dim_num=5, epoch_num=1000):
     return           最終的なパラメータ W1, W2, b1, b2のディクショナリ
     '''
     data = data_from_file(file_path)
-    data['data'] = normalization(data['data'])
+    # data['data'] = normalization(data['data'])
     elements_num = data['N']
     params = initialize_params_randomly(hidden_dim_num, data['D'])
 
     for i in range(epoch_num):
-        total_loss = 0.0
+        sys.stderr.write('\r\033[K' + str(i))
+        sys.stderr.flush()
         for x in data['data']:
             params['x'] = x
             params_new = learn_one_iteration(**params)
             params.update(params_new)
-            total_loss += params['loss']
-            del params['loss']
-        average_loss = total_loss / elements_num
-        print(i, average_loss)
 
+    del params['eta']
+    total_loss = 0.0
+    for x in data['data']:
+        params['x'] = x
+        params_forward = forward(**params)
+        total_loss += params_forward['loss']
+
+    average_loss = total_loss / elements_num
+    params['loss'] = average_loss
     return params
 
 
@@ -88,7 +94,7 @@ def learn_one_iteration(x, W1, W2, b1, b2, eta):
     del args['x']
 
     forward_result = forward(**args_forward)
-    loss = forward_result['loss']
+    #loss = forward_result['loss']
     del forward_result['loss']
     args_bp.update(forward_result)
 
@@ -96,7 +102,7 @@ def learn_one_iteration(x, W1, W2, b1, b2, eta):
     args.update(bp_result)
 
     param_result = param_update(**args)
-    param_result['loss'] = loss
+    #param_result['loss'] = loss
     return param_result
 
 
@@ -205,4 +211,5 @@ def print_params2file(params, file_path):
 
 if __name__ == '__main__':
     params = auto_encoder('./data/dataset.dat')
+    print(params['loss'])
     print_params2file(params, './results/result.txt')
