@@ -9,6 +9,7 @@ import numpy as np
 import random
 import sys
 import data
+import time
 
 class AutoEncoder:
     def __init__(self, data_file_path, hidden_dim_num=5, epoch_num=1000):
@@ -19,32 +20,65 @@ class AutoEncoder:
     def get_params(self):
         return {'W1': self.W1.tolist(), 'W2': self.W2.tolist(), 'b1': self.b1.tolist(), 'b2': self.b2.tolist()}
 
-    def auto_encoder(self):
+    def get_best_params(self):
+        return {'W1': self.bestW1.tolist(), 'W2': self.bestW2.tolist(), 'b1': self.bestb1.tolist(), 'b2': self.bestb2.tolist()}
+
+    def divide_data(self, k):
+        return np.vsplit(self.data['data'], k)
+
+    def updata_best_params(self):
+        self.bestW1 = self.W1
+        self.bestW2 = self.W2
+        self.bestb1 = self.b1
+        self.bestb2 = self.b2
+
+    def calc_loss_and_params(self, k=10):
         '''
         Auto Encoder
         隠れ層1層
+        k分割交差検定
 
         return           最終的なパラメータ W1, W2, b1, b2のディクショナリ
         '''
-        elements_num = self.data['N']
-        self.initialize_params_randomly()
+        test_data_num = self.data['N'] / k
+        self.data['data'] = self.divide_data(k)
+        self.average_loss = [0] * k
+        self.elapsed_time = [0] * k
 
-        for i in range(self.epoch):
-            sys.stderr.write('\r\033[K' + str(i))
-            sys.stderr.flush()
-            for x in self.data['data']:
+        for i in range(k):
+            self.initialize_params_randomly()
+            test_data = self.data['data'][i]
+            train_data = np.vstack(np.delete(self.data['data'], i, 0))
+
+            start = time.time()
+            for j in range(self.epoch):
+                sys.stderr.write('\r\033[K' + str(i) + " " +str(j))
+                sys.stderr.flush()
+                np.random.shuffle(train_data)
+                for x in train_data:
+                    self.x = x
+                    self.learn_one_iteration()
+
+            elapsed_time = time.time() - start
+            self.elapsed_time[i] = elapsed_time
+            print("")
+
+            total_loss = 0.0
+            for x in test_data:
                 self.x = x
-                self.learn_one_iteration()
-        print("")
+                self.forward()
+                total_loss += self.loss
 
-        total_loss = 0.0
-        for x in self.data['data']:
-            self.x = x
-            self.forward()
-            total_loss += self.loss
+            self.average_loss[i] = total_loss / test_data_num
+            if i == 0 or self.average_loss[i] < self.average_loss[i-1]:
+                self.updata_best_params()
 
-        self.average_loss = total_loss / elements_num
+        print("elapsed_time:{0}".format(self.elapsed_time))
+        ave_time = sum(self.elapsed_time) / float(len(self.elapsed_time))
+        print("elapsed_time_ave:{0}".format(ave_time))
         print(self.average_loss)
+        print(sum(self.average_loss) / float(len(self.average_loss)))
+
 
     def learn_one_iteration(self):
         '''
@@ -80,9 +114,6 @@ class AutoEncoder:
         '''
         self.W2 -= self.eta * self.gW2
         self.b2 -= self.eta * self.gb2
-        # print(self.W1)
-        # print(self.gW1)
-
         self.W1 -= self.eta * self.gW1
         self.b1 -= self.eta * self.gb1
 
@@ -117,33 +148,7 @@ class AutoEncoder:
         return
 
 
-# def data_from_file(file_path):
-#     '''
-#     file_pathから訓練データを取得
-#     '''
-#     data = []
-#     for line in open(file_path, 'r'):
-#         data.append(list(map(float, line.split())))
-#     ans = {'N': int(data[0][0]), 'D': int(data[0][1]), 'data':np.array(data[1:])}
-#     return ans
-#
-#
-# def print_params2file(params, file_path):
-#     '''
-#     file_pathに対してparamsをスペース区切りで保存
-#     '''
-#     f = open(file_path,'w')
-#
-#     for Wrow in params['W1']:
-#         f.write(' '.join(list(map(lambda x: str(x), Wrow))) + '\n')
-#     for Wrow in params['W2']:
-#         f.write(' '.join(list(map(lambda x: str(x), Wrow))) + '\n')
-#     f.write(' '.join(list(map(lambda x: str(x), params['b1']))) + '\n')
-#     f.write(' '.join(list(map(lambda x: str(x), params['b2']))) + '\n')
-#     f.close()
-
-
 if __name__ == '__main__':
     ae = AutoEncoder('./data/dataset.dat')
-    ae.auto_encoder()
-    data.print_params2file(ae.get_params(), './results/result_test.txt')
+    ae.calc_loss_and_params()
+    data.print_params2file(ae.get_best_params(), './results/result_test.txt')

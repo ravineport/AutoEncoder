@@ -2,7 +2,7 @@ import numpy as np
 
 def data_from_file(file_path):
     '''
-    file_pathから訓練データを取得
+    file_pathから訓練データを取得　
     '''
     data = []
     for line in open(file_path, 'r'):
